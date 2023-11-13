@@ -34,5 +34,5 @@ fi
 # CPU image for arm64 rpi
 VERSION_BASE=${PREFIX}/ml_api_base:${VERSION}
 echo Building $VERSION_BASE
-docker build --platform linux/arm64 -f Dockerfile.base_rpi -t ${VERSION_BASE}-linux-arm64 .
-docker push ${VERSION_BASE}-linux-amd64
+docker build --platform linux/arm64 -f Dockerfile.base_rpi -t ${VERSION_BASE} .
+docker push ${VERSION_BASE}
