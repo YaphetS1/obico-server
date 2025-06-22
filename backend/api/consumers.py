@@ -8,7 +8,7 @@ from channels.generic.websocket import JsonWebsocketConsumer, WebsocketConsumer
 from django.conf import settings
 from asgiref.sync import async_to_sync
 import logging
-from sentry_sdk import capture_exception, capture_message
+from sentry_sdk import capture_exception, capture_message, isolation_scope
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.timezone import now
 import newrelic.agent
@@ -17,7 +17,7 @@ from channels_presence.models import Presence
 
 from lib import cache
 from lib import channels
-from .octoprint_messages import process_octoprint_status
+from .octoprint_messages import process_printer_status
 from app.models import *
 from lib.tunnelv2 import OctoprintTunnelV2Helper, TunnelAuthenticationError
 from lib.view_helpers import touch_user_last_active
@@ -55,7 +55,22 @@ def report_error(
                 traceback.print_exc()
                 LOGGER.exception(msg or f'{exc.__class__.__name__} in {fn.__module__}.{fn.__qualname__}')
                 if sentry:
-                    capture_exception()
+                    # Get user info if available
+                    user_info = None
+                    if hasattr(self, 'scope') and 'user' in self.scope and self.scope['user'].is_authenticated:
+                        user_info = {'id': self.scope['user'].id}
+                    elif hasattr(self, 'user') and self.user and self.user.is_authenticated:
+                        user_info = {'id': self.user.id}
+                    elif hasattr(self, 'get_printer') and self.get_printer():
+                        user_info = {'id': self.get_printer().user.id}
+
+                    if user_info:
+                        with isolation_scope() as scope:
+                            scope.set_user(user_info)
+                            capture_exception()
+                    else:
+                        capture_exception()
+
                 if close:
                     self.close()
                 return
@@ -292,7 +307,12 @@ class OctoPrintConsumer(WebsocketConsumer):
             channels.send_message_to_web(self.printer.id, data)
         else:
             self.printer.refresh_from_db()
-            process_octoprint_status(self.printer, data)
+            if self.printer.deleted:
+                # Printer deleted. Close the connection.
+                self.close()
+                return
+
+            process_printer_status(self.printer, data)
 
     @newrelic.agent.background_task()
     @report_error
@@ -314,12 +334,19 @@ class OctoPrintConsumer(WebsocketConsumer):
 
 
 class JanusWebConsumer(WebsocketConsumer):
-
     def get_printer(self):
         if 'token' in self.scope['url_route']['kwargs']:
             return Printer.objects.get(
                 auth_token=self.scope['url_route']['kwargs']['token'],
             )
+
+        # Mobileraker wants to use tunnel credential to connect janus websocket
+        try:
+            pt = OctoprintTunnelV2Helper.get_octoprinttunnel(self.scope)
+            if pt and str(pt.printer_id) == self.scope['url_route']['kwargs']['printer_id']:
+                return pt.printer
+        except TunnelAuthenticationError:
+            pass    # Continue to other ways of authentication
 
         if not self.scope['user'].is_authenticated:
             raise Printer.DoesNotExist('session is not authenticated')
@@ -368,69 +395,6 @@ class JanusSharedWebConsumer(JanusWebConsumer):
         return SharedResource.objects.select_related('printer').get(
             share_token=self.scope['url_route']['kwargs']['share_token']
         ).printer
-
-    @newrelic.agent.background_task()
-    @report_error
-    def receive(self, text_data=None, bytes_data=None):
-        # we are going to disable datachannel for shared printer connections
-        # by tampering janus offer/answer messages
-
-        msg = json.loads(text_data)
-        if 'jsep' in msg and msg['jsep']['type'] == 'answer':
-            sdp = msg['jsep']['sdp']
-
-            if 'BUNDLE video\r\n' not in sdp:
-                # frontend should request only video,
-                # if thats's not the case, then something went wrong
-                # with patching the offer (bellow)
-                capture_message(
-                    'bad sdp bundle',
-                    extras={'sdp': sdp}
-                )
-                return
-
-        channels.send_msg_to_printer(self.printer.id, {'janus': text_data})
-
-    @newrelic.agent.background_task()
-    @report_error
-    def janus_message(self, message):
-        # we are going to disable datachannel for shared printer connections
-        # by tampering janus offer/answer messages
-
-        msg = json.loads(message['msg'])
-        if 'jsep' in msg and msg['jsep']['type'] == 'offer':
-            sdp = msg['jsep']['sdp']
-
-            if 'BUNDLE video data\r\n' not in sdp:
-                # only valid case here is when video is disabled in the plugin,
-                # "BUNDLE data"
-                # ... in that case no need to continue negotiation, as plugin
-                # has nothing to offer.
-
-                # all other cases are unexpected,
-                # no need to let them go through.
-                return
-
-            # removing data from bundle
-            sdp = sdp.replace('BUNDLE video data', 'BUNDLE video')
-
-            # datachannel related parts are at the end of sdp,
-            # this is the starting position
-            delete_from = sdp.find('m=application')
-
-            if delete_from < 0:
-                # too strange, ignoring message
-                capture_message(
-                    'missing application from sdp bundle',
-                    extras={'sdp': sdp}
-                )
-                return
-
-            sdp = sdp[:delete_from]
-
-            msg['jsep']['sdp'] = sdp
-
-        self.send(text_data=json.dumps(msg))
 
 
 class OctoprintTunnelWebConsumer(WebsocketConsumer):

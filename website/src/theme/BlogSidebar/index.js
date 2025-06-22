@@ -16,6 +16,18 @@ export default function BlogSidebar({sidebar, tags}) {
 
   return (
     <>
+      <div className={styles.nozzleNinzaBlock}>
+        <h2>JusPrin 1.0</h2>
+        <h3>The First GenAI 3D Printing Experience <span className={styles.obicoAccent}>Now Available!</span></h3>
+        <div className={styles.nozzleNizaBadgeImage}>
+          <img src='/img/JUSPRIN_BANNER.png' alt='JusPrin Logo'/>
+        </div>
+        <div>
+          <a href='https://github.com/TheSpaghettiDetective/JusPrin/releases/latest'>
+            <button className={styles.learnMoreButton}>Try JusPrin Now</button>
+          </a>
+        </div>
+      </div>
       {tags && tags.length > 0 && (
         <nav
           className={clsx(styles.sidebar, styles.categories)}
@@ -28,19 +40,17 @@ export default function BlogSidebar({sidebar, tags}) {
             Tags
           </div>
           <ul className={styles.sidebarItemList}>
-            {tags.map((item) => {
-              return (
-                <li key={item.permalink} className={styles.sidebarItem}>
-                  <Link
-                    isNavLink
-                    to={item.permalink}
-                    className={styles.sidebarItemLink}
-                    activeClassName={styles.sidebarItemLinkActive}>
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
+            {tags.map((item, index) => (
+              <li key={`tag-${item.permalink}-${index}`} className={styles.sidebarItem}>
+                <Link
+                  isNavLink
+                  to={item.permalink}
+                  className={styles.sidebarItemLink}
+                  activeClassName={styles.sidebarItemLinkActive}>
+                  {item.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </nav>
       )}
@@ -56,19 +66,17 @@ export default function BlogSidebar({sidebar, tags}) {
           {sidebar.title}
         </div>
         <ul className={styles.sidebarItemList}>
-          {sidebar.items.map((item) => {
-            return (
-              <li key={item.permalink} className={styles.sidebarItem}>
-                <Link
-                  isNavLink
-                  to={item.permalink}
-                  className={styles.sidebarItemLink}
-                  activeClassName={styles.sidebarItemLinkActive}>
-                  {item.title}
-                </Link>
-              </li>
-            );
-          })}
+          {sidebar.items.map((item, index) => (
+            <li key={`sidebar-${item.permalink}-${index}`} className={styles.sidebarItem}>
+              <Link
+                isNavLink
+                to={item.permalink}
+                className={styles.sidebarItemLink}
+                activeClassName={styles.sidebarItemLinkActive}>
+                {item.title}
+              </Link>
+            </li>
+          ))}
         </ul>
       </nav>
     </>

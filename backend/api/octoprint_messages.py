@@ -13,14 +13,14 @@ from lib.heater_trackers import process_heater_temps
 LOGGER = logging.getLogger(__name__)
 STATUS_TTL_SECONDS = 120
 
-def process_octoprint_status(printer: Printer, msg: Dict) -> None:
+def process_printer_status(printer: Printer, msg: Dict) -> None:
     # Backward compatibility: octoprint_settings is for OctoPrint-Obico 2.1.2 or earlier, or moonraker-obico 0.5.1 or earlier
-    octoprint_settings = msg.get('settings') or msg.get('octoprint_settings')
-    if octoprint_settings:
-        cache.printer_settings_set(printer.id, settings_dict(octoprint_settings))
+    printer_settings = msg.get('settings') or msg.get('octoprint_settings')
+    if printer_settings:
+        cache.printer_settings_set(printer.id, settings_dict(printer_settings))
 
-        agent_name = octoprint_settings.get('agent', {}).get('name')
-        agent_version = octoprint_settings.get('agent', {}).get('version')
+        agent_name = printer_settings.get('agent', {}).get('name')
+        agent_version = printer_settings.get('agent', {}).get('version')
         if agent_name != printer.agent_name or agent_version != printer.agent_version:
             printer.agent_name = agent_name
             printer.agent_version = agent_version
@@ -32,17 +32,10 @@ def process_octoprint_status(printer: Printer, msg: Dict) -> None:
 
     if not printer_status:
         cache.printer_status_delete(printer.id)
-    elif (printer_status or {}).get('_ts'):   # data format for plugin 1.6.0 and higher
+    elif (printer_status or {}).get('_ts'):
         cache.printer_status_set(printer.id, json.dumps((printer_status or {})), ex=STATUS_TTL_SECONDS)
-    else: # TODO: retire this part after 7/1/2023
-        octoprint_data: Dict = dict()
-        set_as_str_if_present(octoprint_data, (printer_status or {}), 'state')
-        set_as_str_if_present(octoprint_data, (printer_status or {}), 'progress')
-        set_as_str_if_present(octoprint_data, (printer_status or {}), 'file_metadata')
-        set_as_str_if_present(octoprint_data, (printer_status or {}), 'currentZ')
-        set_as_str_if_present(octoprint_data, (printer_status or {}), 'job')
-        set_as_str_if_present(octoprint_data, (printer_status or {}), 'temperatures')
-        cache.printer_status_set(printer.id, octoprint_data, ex=STATUS_TTL_SECONDS)
+    else:
+        LOGGER.warn(f'printer_status present but no _ts. Received status: {msg}')
 
     update_current_print_if_needed(msg, printer)
 
@@ -53,27 +46,46 @@ def process_octoprint_status(printer: Printer, msg: Dict) -> None:
         process_heater_temps(printer, temps)
 
 
-def settings_dict(octoprint_settings):
-    webcam_settings = dict(Printer.DEFAULT_WEBCAM_SETTINGS)
+def settings_dict(printer_settings):
+    # Backward compatibility: printer_settings.get('webcam') is for old agent versions, ie, OctoPrint-Obico 2.5.0 or earlier, or moonraker-obico 1.7.0 or earlier
+    if printer_settings.get('webcam'):
+        webcam_settings = Printer.DEFAULT_WEBCAM_SETTINGS.copy()
+        webcam_settings.update(printer_settings.get('webcam'))
+        webcams = [webcam_settings]
+    else:
+        webcams = printer_settings.get('webcams')
 
-    webcam_settings.update(octoprint_settings.get('webcam', {}))
-    settings = dict(('webcam_' + k, str(v)) for k, v in webcam_settings.items())
+    settings = dict()
+    data_channel_id = printer_settings.get('data_channel_id', '')
 
-    settings.update(dict(temp_profiles=json.dumps(octoprint_settings.get('temperature', {}).get('profiles', []))))
-    settings.update(dict(printer_metadata=json.dumps(octoprint_settings.get('printer_metadata', {}))))
+    if webcams is not None:
+        settings.update(dict(webcams=json.dumps(webcams)))
+
+    # Backward compatibility: for OctoPrint-Obico 2.5.1 or earlier, or moonraker-obico 2.0.2 or earlier
+    if data_channel_id == '' and webcams:
+        agent_data_channel = next((webcam for webcam in webcams if webcam.get('data_channel_available')), None) or \
+            next((webcam for webcam in webcams if webcam.get('is_primary_camera') and webcam.get('stream_mode') == 'h264_transcode' ), None)
+        if agent_data_channel:
+            data_channel_id = agent_data_channel.get('stream_id')
+
+    settings.update(dict(data_channel_id=data_channel_id))
+    settings.update(dict(temp_profiles=json.dumps(printer_settings.get('temperature', {}).get('profiles', []))))
+    settings.update(dict(printer_metadata=json.dumps(printer_settings.get('printer_metadata', {}))))
     settings.update(
-        tsd_plugin_version=octoprint_settings.get('tsd_plugin_version', ''),
-        octoprint_version=octoprint_settings.get('octoprint_version', ''),
+        tsd_plugin_version=printer_settings.get('tsd_plugin_version', ''),
+        octoprint_version=printer_settings.get('octoprint_version', ''),
     )
-    settings.update(dict(platform_uname=json.dumps(octoprint_settings.get('platform_uname', []))))
-    settings.update(dict(installed_plugins=json.dumps(octoprint_settings.get('installed_plugins', []))))
+    settings.update(dict(platform_uname=json.dumps(printer_settings.get('platform_uname', []))))
+    settings.update(dict(installed_plugins=json.dumps(printer_settings.get('installed_plugins', []))))
+
 
     return settings
 
 
 def update_current_print_if_needed(msg, printer):
     if not msg.get('current_print_ts'):  # Absence of current_print_ts means OctoPrint/Moonraker has lost the connection to the printer, and hence printing status unknown.
-        LOGGER.warn(f'current_print_ts not present. Received status: {msg}')
+        if msg:
+            LOGGER.warn(f'Status received but current_print_ts is missing. Received status: {msg}')
         return
 
     # Backward compatibility: octoprint_event is for OctoPrint-Obico 2.1.2 or earlier, or moonraker-obico 0.5.1 or earlier

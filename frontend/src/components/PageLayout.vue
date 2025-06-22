@@ -6,22 +6,13 @@
     <!-- Sidebar -->
     <nav class="side-nav">
       <a href="/" class="sidebar-header">
-        <div v-if="$brand">
-          <img
-            :src="`/static/img/branding/${$brand}/logo-square.png`"
-            class="logo-small"
-            alt="Logo"
-          />
-        </div>
-        <svg v-else class="logo-small">
-          <use href="#svg-logo-compact" />
-        </svg>
+        <SyndicateAwareSVG href="#svg-logo-compact" width="100" height="30" />
       </a>
       <ul class="list-unstyled m-0">
         <li v-if="isEnt && !user.is_pro" :class="{ active: path === '/ent_pub/pricing/' }">
           <a href="/ent_pub/pricing/" class="primary">
             <font-awesome-icon icon="star" />
-            Upgrade to Pro
+            {{$t("Upgrade to Pro")}}
           </a>
         </li>
         <li v-if="user" :class="{ active: path.includes('/printers/') }">
@@ -30,13 +21,13 @@
               <use href="#svg-3d-printer" />
             </svg>
             <br />
-            Printers
+            {{$t("Printers")}}
           </a>
         </li>
         <li v-if="user" :class="{ active: path.includes('/g_code_') }">
           <a href="/g_code_folders/cloud/">
             <font-awesome-icon icon="fa-file-code" />
-            G-Codes
+            {{$t("G-Codes")}}
           </a>
         </li>
         <li
@@ -45,13 +36,22 @@
         >
           <a href="/print_history/">
             <font-awesome-icon icon="fa-calendar-days" />
-            Print History
+            {{$t("Print History")}}
+          </a>
+        </li>
+        <li
+          v-if="isEnt && user"
+          :class="{ active: path.includes('/ent/designs/') }"
+        >
+          <a href="/ent/designs/">
+            <i class="fa fa-light fa-cubes" />
+            {{$t("3D Models")}}
           </a>
         </li>
         <li v-if="user" :class="{ active: path.includes('/stats/') }">
           <a href="/stats/">
             <font-awesome-icon icon="fa-chart-pie" />
-            Statistics
+            {{$t("Statistics")}}
           </a>
         </li>
       </ul>
@@ -60,19 +60,19 @@
           <li v-if="isEnt" :class="{ active: path === '/ent_pub/pricing/' }">
             <a href="/ent_pub/pricing/">
               <font-awesome-icon icon="fa-money-check-dollar" />
-              Pricing
+              {{$t("Pricing")}}
             </a>
           </li>
           <li>
             <a href="https://www.obico.io/help/" target="_blank">
               <font-awesome-icon icon="fa-circle-question" />
-              Help
+              {{$t("Help")}}
             </a>
           </li>
           <li>
             <a href="https://obico.io/discord" target="_blank">
               <font-awesome-icon icon="fa-brands fa-discord" />
-              Community
+              {{$t("Community")}}
             </a>
           </li>
           <li>
@@ -86,13 +86,13 @@
                   unseenPrinterEventsDisplay
                 }}</span>
               </div>
-              <span class="trim-text">Notifications</span>
+              <span class="trim-text">{{ $t("Notifications") }}</span>
             </a>
           </li>
           <li v-if="user" :class="{ active: path.includes('/user_preferences/') }">
             <a href="/user_preferences/">
               <font-awesome-icon icon="fas fa-cog" />
-              <span class="trim-text">Preferences</span>
+              <span class="trim-text">{{ $t("Preferences") }}</span>
             </a>
           </li>
         </ul>
@@ -127,9 +127,6 @@
       </b-navbar>
       <!-- Page content -->
       <div class="page-content">
-        <content-top
-          v-if="layoutSections.contentTop && !path.match('\/printers\/[0-9]+\/control\/')"
-        ></content-top>
         <slot name="content"></slot>
       </div>
     </div>
@@ -140,16 +137,9 @@
 <script>
 import get from 'lodash/get'
 import { inMobileWebView, user, settings } from '@src/lib/page-context'
-import layoutSections from '@config/layout/sections'
 
 export default {
   name: 'PageLayout',
-
-  components: {
-    ...Object.keys(layoutSections).reduce((obj, name) => {
-      return Object.assign(obj, { [name]: layoutSections[name].importComponent })
-    }, {}),
-  },
 
   props: {
     isPopup: {
@@ -160,7 +150,6 @@ export default {
 
   data() {
     return {
-      layoutSections,
       collapsed: true,
       path: window.location.pathname,
       user: null,
@@ -380,7 +369,7 @@ export default {
   padding: calc(50px + var(--gap-between-blocks)) calc(var(--gap-between-blocks) - 15px) var(--gap-between-blocks)
   display: flex
   flex-direction: column
-  min-height: calc(100vh - 68px)
+  min-height: 100vh
 
 .content-overlay
   position: fixed
@@ -411,7 +400,7 @@ export default {
         display: none
       .page-content
         padding-top: 30px
-        min-height: calc(100vh - 68px)
+        min-height: 100vh
 
 @media (max-width: 768px)
   .page-wrapper

@@ -6,7 +6,7 @@
         v-if="isPopup"
         href="#"
         class="btn shadow-none icon-btn d-inline"
-        title="Go Back"
+        :title="$t('Go Back')"
         @click.prevent="goBack"
       >
         <i class="fas fa-chevron-left"></i>
@@ -14,12 +14,20 @@
     </template>
     <template #topBarRight>
       <div class="action-panel">
+        <a
+          v-if="canDownloadGcode"
+          @click.prevent="downloadGcode"
+          class="btn shadow-none icon-btn action-btn"
+          :title="$t('Download file')"
+        >
+          <i class="fas fa-download"></i>
+        </a>
         <!-- Rename -->
         <a
           v-if="isCloud"
           href="#"
           class="btn shadow-none icon-btn action-btn"
-          title="Rename file"
+          :title="$t('Rename file')"
           @click.prevent="renameFile"
         >
           <i class="fas fa-edit"></i>
@@ -29,7 +37,7 @@
           v-if="isCloud"
           href="#"
           class="text-danger btn shadow-none icon-btn action-btn"
-          title="Delete file"
+          :title="$t('Delete file')"
           @click.prevent="deleteFile"
         >
           <i class="fas fa-trash-alt"></i>
@@ -41,21 +49,7 @@
           </template>
           <cascaded-dropdown
             ref="cascadedDropdown"
-            :menu-options="[
-              {
-                key: 'renameFile',
-                icon: 'fas fa-edit',
-                title: `Rename file`,
-                callback: true,
-              },
-              {
-                key: 'deleteFile',
-                icon: 'fas fa-trash-alt',
-                customMenuOptionClass: 'text-danger',
-                title: `Delete file`,
-                callback: true,
-              },
-            ]"
+            :menu-options="dropdownMenuOptions"
             @menuOptionClicked="onMenuOptionClicked"
           />
         </b-dropdown>
@@ -78,7 +72,7 @@
         <b-row>
           <b-col class="text-center mt-5">
             <div v-if="gcodeNotFound">
-              <p>This G-Code file doesn't exists</p>
+              <p>{{ $t("This G-Code file doesn't exists") }}</p>
             </div>
             <div v-else>
               <b-spinner />
@@ -90,12 +84,12 @@
         <b-row>
           <b-col :lg="isPopup ? 12 : 5">
             <b-alert :show="isDeleted" variant="warning warning-block">
-              This file is deleted and unavailable for print
+              {{$t("This file is deleted and unavailable for print")}}
             </b-alert>
 
             <!-- File details -->
             <g-code-details :file="gcode" :show-print-stats="true" :compact-view="false" />
-
+            <jusprin-feedback v-if="isCloud" class="card-container jusprin-feedback" :g-code-file-id="gcode.id" />
             <!-- Available printers -->
             <available-printers
               v-if="!isDeleted"
@@ -111,7 +105,7 @@
           <b-col :lg="isPopup ? 12 : 7">
             <!-- Print history -->
             <div class="print-history" :class="{ 'full-width': isPopup || isDeleted }">
-              <h2 class="section-title mb-3">Print History</h2>
+              <h2 class="section-title mb-3">{{ $t("Print History") }}</h2>
               <div v-if="gcode.print_set.length">
                 <print-history-item
                   v-for="print of gcode.print_set"
@@ -122,7 +116,7 @@
               </div>
               <div v-else>
                 <div class="card-container p-4 justify-content-center text-secondary">
-                  This file doesn't have any prints yet
+                  {{$t("This file doesn't have any prints yet")}}
                 </div>
               </div>
             </div>
@@ -157,6 +151,7 @@ import {
 import PrintHistoryItem from '@src/components/prints/PrintHistoryItem.vue'
 import CascadedDropdown from '@src/components/CascadedDropdown'
 import GCodeDetails from '@src/components/GCodeDetails.vue'
+import JusprinFeedback from '@src/components/g-codes/JusprinFeedback.vue'
 
 export default {
   name: 'GCodeFilePage',
@@ -169,6 +164,7 @@ export default {
     PrintHistoryItem,
     CascadedDropdown,
     GCodeDetails,
+    JusprinFeedback,
   },
 
   props: {
@@ -211,6 +207,37 @@ export default {
     isDeleted() {
       return !!this.gcode?.deleted
     },
+    dropdownMenuOptions() {
+      const menuOptions = [
+        {
+          key: 'renameFile',
+          icon: 'fas fa-edit',
+          title: this.$i18next.t(`Rename file`),
+          callback: true,
+        },
+        {
+          key: 'deleteFile',
+          icon: 'fas fa-trash-alt',
+          customMenuOptionClass: 'text-danger',
+          title: this.$i18next.t(`Delete file`),
+          callback: true,
+        },
+      ]
+
+      if (this.canDownloadGcode) {
+        menuOptions.unshift({
+          key: 'downloadGcode',
+          icon: 'fas fa-download',
+          title: this.$i18next.t(`Download file`),
+          callback: true,
+        })
+      }
+
+      return menuOptions
+    },
+    canDownloadGcode() {
+      return this.gcode?.url && this.gcode?.safe_filename
+    },
   },
 
   async created() {
@@ -228,6 +255,8 @@ export default {
         this.renameFile()
       } else if (menuOptionKey === 'deleteFile') {
         this.deleteFile()
+      } else if (menuOptionKey === 'downloadGcode') {
+        this.downloadGcode()
       }
     },
     getRouteParam(name) {
@@ -243,7 +272,7 @@ export default {
           this.printer = normalizedPrinter(response.data)
         })
         .catch((error) => {
-          this.errorDialog(error, 'Host printer for this gcode not found')
+          this.errorDialog(error, `${this.$i18next.t('Host printer for this gcode not found')}`)
         })
     },
     async fetchLocalFile() {
@@ -353,6 +382,23 @@ export default {
     onRefresh() {
       this.$router.go()
     },
+    async downloadGcode() {
+      const fileUrl = this.gcode.url
+
+      const response = await fetch(fileUrl);
+      const blob = await response.blob();
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = this.gcode.safe_filename
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      URL.revokeObjectURL(link.href);
+      document.body.removeChild(link);
+    }
   },
 }
 </script>
@@ -361,7 +407,8 @@ export default {
 .warning-block
   margin-bottom: var(--gap-between-blocks)
 
-.available-printers
+.available-printers,
+.jusprin-feedback
   margin-top: var(--gap-between-blocks)
   &.full-width
     margin-top: 15px

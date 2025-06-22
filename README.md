@@ -6,13 +6,15 @@ This repo is everything you need to run a self-hosted Obico Server.
 
 The AI failure detection in this project is based on a Deep Learning model. [See how the model works on real data](https://app.obico.io/ent_pub/publictimelapses/).
 
+> **Note:** If you are looking for information about setting up self-hosted server for [JusPrin](https://github.com/TheSpaghettiDetective/JusPrin), please see [README_jusprin_server.md](README_jusprin_server.md) for specific instructions.
+
 # Install and run the server
 
-*Note: Form more detailed instructions, head to [the Obico Server guide](https://www.obico.io/docs/server-guides/).*
+> **Note:** For more detailed instructions, head to [the Obico Server guide](https://www.obico.io/docs/server-guides/).*
 
 ## Prerequisites
 
-The Obico Server only requires a computer to run. Even old PCs (within the previous 10 years) will do just fine. A NVidia GPU is optional but can vastly reduce the power consumption and beef up the number of printers the server can handle.
+The Obico Server only requires a computer to run. Even old PCs (within the previous 10 years) will do just fine. An Nvidia GPU is optional but can vastly increase the power consumption and beef up the number of printers the server can handle.
 
 [Detailed hardware minimum specs](https://www.obico.io/docs/server-guides/hardware-requirements/).
 
@@ -44,7 +46,7 @@ git clone -b release https://github.com/TheSpaghettiDetective/obico-server.git
 
 3. Go grab a coffee. Step 2 will take 15-30 minutes.
 
-4. There is no step 4. This is how easy it is to get Obico up and running (thanks to Docker and Docker-compose).
+4. If the Obico Server is running on `localhost`, there will be no step 4. If it is running on a different host, such as a VM in the cloud, go ahead to [configure the Django site](https://www.obico.io/docs/server-guides/configure/#django-site).
 
 Open "http://localhost:3334" on the same computer. Voila - your self-hosted Obico Server is now up and running!
 
@@ -71,7 +73,7 @@ It is also recommended that a static IP is set to avoid issues with changing IP'
 
 1. Open Django admin page at `http://your_server_ip:3334/admin/`.
 
-*Note: If the browser complains "Can't connect to the server", wait for a couple more minutes. The web server container may still be starting up.*
+> **Note:** If the browser complains "Can't connect to the server", wait for a couple more minutes. The web server container may still be starting up.*
 
 2. Login with username `root@example.com`, password `supersecret`. Once logged in, you can optionally (but are highly encouraged to) change the admin password using this link: `http://your_server_ip:3334/admin/app/user/1/password/`.
 
@@ -83,7 +85,7 @@ It is also recommended that a static IP is set to avoid issues with changing IP'
 
 ![Site configuration](website/static/img/server-guides/site_config.png)
 
-*Note: If you are using reverse proxy, "Domain name" needs to be set to `reverse_proxy_ip:reverse_proxy_port`. See [using a reverse proxy](https://www.obico.io/docs/server-guides/advanced/reverse-proxy/) for details.*
+> **Note:** If you are using reverse proxy, "Domain name" needs to be set to `reverse_proxy_ip:reverse_proxy_port`. See [using a reverse proxy](https://www.obico.io/docs/server-guides/advanced/reverse-proxy/) for details.*
 
 That's it! You now have a fully-functional Obico Server that your OctoPrint can talk to. We hope setting up the server has not been overwhelming.
 

@@ -12,15 +12,15 @@ To use Gmail's SMTP server for sending email, follow the following simple steps.
 
 Follow [this guide](https://support.google.com/accounts/answer/185839) to turn on 2-Step Verification.
 
-## 2. Add an "app password" for your self-hosted Obico server. {#2-add-an-app-password-for-your-self-hosted-obico-server}
+## 2. Add an "app password" for your self-hosted Obico Server. {#2-add-an-app-password-for-your-self-hosted-obico-server}
 
 1. Go to the account page for the Gmail account you intend to use.
 1. Select "Security".
-1. Under "Signing in to Google," select "App Passwords".
-1. At the bottom, choose "Select app", and "Other (Custom name)".
-1. Choose a name for this app password, such as "My Obico server".
-1. Click "Generate".
-1. On the next screen, copy the text in the yellow box. This is the pass you will use in the next step.
+1. Under "How you sign in to Google" select "2-Step Verification".
+1. At the bottom, choose "App Passwords".
+1. Choose a name for this app password, such as "My Obico Server".
+1. Click "Create".
+1. On the next screen, copy the text in the white box. This is the pass you will use in the next step.
 
 
 ![Site configuration](/img/server-guides//gmail_setup_1.png)
@@ -44,7 +44,7 @@ EMAIL_USE_TLS=True
 ```
 
 :::tip
-If you can't find the `.env` file, check out [this guide](../configure.md/#email-smtp).
+If you can't find the `.env` file, check out [this guide](../../configure/#email-smtp).
 :::
 
 ## 4. Restart the server. {#4-restart-the-server}
@@ -53,4 +53,4 @@ If you can't find the `.env` file, check out [this guide](../configure.md/#email
 
 ## 5. Send a test email {#5-send-a-test-email}
 
-Follow [this guide](email_guide.md/#test-if-your-email-server-configuration-works) to send a test email.
+Follow [this guide](../../configure/#email-smtp) to configure email settings and [this guide](../email_guide/#test-if-your-email-server-configuration-works) to send a test email.

@@ -1,4 +1,5 @@
-FROM yaphets1/ml_api_base:latest
+FROM thespaghettidetective/ml_api_base:1.4
+#FROM yaphets1/ml_api_base:latest
 WORKDIR /app
 EXPOSE 3333
 

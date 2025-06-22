@@ -46,7 +46,6 @@ coverage.xml
 .pytest_cache/
 
 # Translations
-*.mo
 *.pot
 
 # Django stuff:
@@ -135,3 +134,4 @@ docker-compose.override.yml
 frontend/webpack-stats.json
 
 .idea/
+.anima/

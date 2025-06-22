@@ -1,5 +1,6 @@
 ---
 title: Telegram Setup Guide
+description: Learn how to set up Telegram for Obico.
 ---
 
 :::note
@@ -81,7 +82,7 @@ sudo docker compose up -d
 ```
 ![reboot](/img/server-guides/telegram/reboot.JPG)
 
-11. Go on your Obico server VIA link connected to Telegram.
+11. Go on your Obico Server VIA link connected to Telegram.
 
 Go in preferences and connect to Telegram.
 

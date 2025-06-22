@@ -43,6 +43,10 @@ def disco_to_device_message_queue_key(
     return f'printer_discovery:{client_ip}:messages_to:{device_id}'
 
 
+def one_time_passcode_key(code) -> str:
+    return f'otp:{code}'
+
+
 def printer_key_prefix(printer_id):
     return 'printer:{}:'.format(printer_id)
 
@@ -54,14 +58,8 @@ def pic_post_throttle_key(printer_id):
     return 'thr:{}:{}'.format(printer_id, datetime.now().minute)
 
 def printer_status_set(printer_id, mapping, ex):
-    if isinstance(mapping, dict):  #TODO: retire this part after 7/1/2023
-        cleaned_mapping = {k: v for k, v in mapping.items() if v is not None}
-        prefix = printer_key_prefix(printer_id) + 'status'
-        REDIS.hmset(prefix, cleaned_mapping)
-        REDIS.expire(prefix, ex)
-    else:
-        prefix = printer_key_prefix(printer_id) + 'status_str'
-        REDIS.setex(prefix, ex, mapping)
+    prefix = printer_key_prefix(printer_id) + 'status_str'
+    REDIS.setex(prefix, ex, mapping)
 
 
 def printer_status_get(printer_id, key=None):
@@ -73,18 +71,6 @@ def printer_status_get(printer_id, key=None):
             return results.get(key)
         else:
             return results
-
-    prefix = printer_key_prefix(printer_id) + 'status'
-    if key:
-        v = REDIS.hget(prefix, key)
-        if not v:
-            return None
-        return json.loads(v)
-    else:
-        status_data = REDIS.hgetall(prefix)
-        for k, v in status_data.items():
-            status_data[k] = json.loads(v)
-        return status_data
 
 
 def printer_status_delete(printer_id):
@@ -109,7 +95,7 @@ def printer_pic_get(printer_id, key=None):
 
 
 def printer_settings_set(printer_id, mapping, ex=None):
-    cleaned_mapping = {k: v for k, v in mapping.items() if v is not None}
+    cleaned_mapping = {k: v for k, v in mapping.items() if v is not None} # Redis doesn't allow None values
     prefix = printer_key_prefix(printer_id) + 'settings'
     REDIS.hmset(prefix, cleaned_mapping)
     if ex:
@@ -300,6 +286,15 @@ def disco_pop_raw_device_messages(
             tordset_key, min='-inf', max=cur_time - expiration_secs)
         conn.zpopmin(tordset_key, message_count)
         return [raw_msg for (raw_msg, _) in conn.execute()[1]]
+
+
+def lookup_value_by_one_time_passcode(code):
+    return REDIS.get(one_time_passcode_key(code))
+
+
+def set_value_by_one_time_passcode(new_code, ttl, value):
+    REDIS.setex(one_time_passcode_key(new_code), ttl, value)
+
 
 def pic_post_over_limit(printer_id, limit_per_minute):
     key = pic_post_throttle_key(printer_id)

@@ -1,5 +1,5 @@
 import { isLocalStorageSupported } from './utils.js'
-import * as branding from './branding.js'
+import * as syndicates from './syndicate.js'
 
 
 const Themes = {
@@ -9,7 +9,6 @@ const Themes = {
 }
 
 const defaultTheme = (isLocalStorageSupported() ? localStorage.getItem('colorTheme') : Themes.Dark) || Themes.Dark
-
 
 // CSS Vars
 
@@ -168,7 +167,18 @@ const shadows = [
 
 
 // Get theme value (exclude "System")
-function currentThemeValue(theme) {
+function currentThemeValue(theme, syndicate) {
+  const singleThemeSyndicates = {
+    jusprin: Themes.Light,
+    yumi: Themes.Dark,
+    kingroon: Themes.Light,
+    mintion: Themes.Light,
+  }
+
+  if (syndicate && singleThemeSyndicates[syndicate]) {
+    return singleThemeSyndicates[syndicate]
+  }
+
   // Get system settings
   if (theme.value === Themes.System) {
     if (window.matchMedia('(prefers-color-scheme)').media !== 'not all' && window.matchMedia('(prefers-color-scheme: light)').matches) {
@@ -181,9 +191,21 @@ function currentThemeValue(theme) {
   return theme.value
 }
 
+function mergeColorOverrides(defaultColors, syndicateColors) {
+  const merged = new Map(defaultColors.map(color => [color.name, color]));
 
-function initTheme(themeValue, brand) {
-  const finalColors =(brand && branding[brand]) ? [...colors, ...branding[brand].colors] : colors
+  syndicateColors.forEach(color => {
+    merged.set(color.name, color);
+  });
+
+  return Array.from(merged.values());
+}
+
+
+function initTheme(themeValue, syndicate) {
+  const finalColors = syndicate && syndicates[syndicate]
+  ? mergeColorOverrides(colors, syndicates[syndicate].colors)
+  : colors;
 
   finalColors.forEach(function(color) {
     document.documentElement.style.setProperty(`--color-${color.name}`, color.values[themeValue])

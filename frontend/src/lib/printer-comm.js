@@ -5,6 +5,7 @@ import ifvisible from 'ifvisible'
 import pako from 'pako'
 import { toArrayBuffer } from '@src/lib/utils'
 import { clearPrinterTransientState } from '@src/lib/printer-transient-state'
+import i18n from '@src/i18n/i18n.js'
 
 // PrinterCommManager is a singleton: https://www.sitepoint.com/javascript-design-patterns-singleton/
 class PrinterCommManager {
@@ -36,7 +37,9 @@ class PrinterCommManager {
     const printerComm = this.getPrinterComm(printerId)
     if (printerComm) {
       printerComm.closeServerWebSocket()
-      if (printerComm.webrtc) printerComm.webrtc.close()
+      printerComm.webrtcConnections.forEach((webrtc) => {
+        if (webrtc) webrtc.close();
+      });
       this.printerCommMap.delete(printerId)
     }
   }
@@ -53,8 +56,9 @@ export default function PrinterComm(printerId, wsUri, callbacks) {
   const self = { printerId, wsUri, ...callbacks }
 
   self.ws = null
-  self.webrtc = null
+  self.webrtcConnections = new Map(); // key: webcamName. Null if it's data channel-only WebRTC
   self.passthruQueue = new Map()
+
   ifvisible.on('blur', function () {
     self.closeWebSocket()
   })
@@ -120,8 +124,13 @@ export default function PrinterComm(printerId, wsUri, callbacks) {
     }, 30 * 1000)
   }
 
-  self.setWebRTC = function (webrtc) {
-    self.webrtc = webrtc
+  self.setWebRTCConnection = function(webcamName, webrtc) {
+    if (self.webrtcConnections.has(webcamName)) {
+      console.log(`WARNING: Existing WebRTC connection for ${webcamName} in printerComm. Closing it.`);
+      self.webrtcConnections.get(webcamName).close();
+    }
+
+    self.webrtcConnections.set(webcamName, webrtc);
 
     function parseJsonData(jsonData) {
       let msg = {}
@@ -140,8 +149,17 @@ export default function PrinterComm(printerId, wsUri, callbacks) {
       self.onStatusReceived && self.onStatusReceived(msg)
     }
 
-    self.webrtc.setCallbacks({
-      onData: (maybeBin) => {
+
+    const callbacksFuncs = {
+      onDestroy: () => {
+        if (self.webrtcConnections.get(webcamName) === webrtc) {  // only remove if it's the same object
+          self.webrtcConnections.delete(webcamName);
+        }
+      },
+    };
+
+    if (webcamName === null) { // data channel-only WebRTC
+      callbacksFuncs.onData = function (maybeBin) {
         if (typeof maybeBin === 'string' || maybeBin instanceof String) {
           parseJsonData(maybeBin)
         } else {
@@ -149,9 +167,11 @@ export default function PrinterComm(printerId, wsUri, callbacks) {
             parseJsonData(pako.ungzip(new Uint8Array(arrayBuffer), { to: 'string' }))
           })
         }
-      },
-    })
-  }
+      }
+    }
+
+    self.webrtcConnections.get(webcamName).setCallbacks(callbacksFuncs);
+  };
 
   self.passThruToPrinter = function (msg, callback) {
     if (self.canSend()) {
@@ -164,14 +184,17 @@ export default function PrinterComm(printerId, wsUri, callbacks) {
             clearPrinterTransientState(self.printerId)
             Vue.swal.Toast.fire({
               icon: 'error',
-              title: 'Failed to contact printer. Is it powered on and connected to Internet?',
+              title: `${i18n.t('Failed to contact printer. Is it powered on and connected to Internet?')}`,
             })
           }
-        }, 10 * 1000)
+        }, 60 * 1000)
       }
-      if (self.webrtc) {
-        self.webrtc.sendData(JSON.stringify(msg))
+
+      const dataChannelWebrtc = self.webrtcConnections.get(null); // key == null -> data channel-only WebRTC
+      if (dataChannelWebrtc) {
+        dataChannelWebrtc.sendData(JSON.stringify(msg))
       }
+
       self.ws.send(JSON.stringify({ passthru: msg }))
     } else {
       if (callback) {
